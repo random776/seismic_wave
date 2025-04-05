@@ -65,7 +65,7 @@ program seismic
     do while (t < t_end)
         do i = 1, n_angles
         if (sqrt(x(i)**2 + y(i)**2) <= 10.0_8 .and. x(i) >= 0.0_8 .and. y(i) >=0.0_8 ) then
-            ! 回転行列
+            ! 回転行列（座標変換）
             x_prev = x(i)
             y_prev = y(i)
             x_mod(i) = x(i) * wave_cos(x(i), y(i)) - y(i) * wave_sin(x(i), y(i))

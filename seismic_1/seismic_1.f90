@@ -27,10 +27,10 @@ program seismic
     do while (t < t_end .and. y >= 0.0_8)
         y_old = y
         sin_theta_old = sin_theta
-        y = y + cos_theta * wave_speed(y, a, b) * dt
-        x = x + sin_theta * wave_speed(y, a, b) * dt
-        sin_theta = wave_speed(y, a, b) / wave_speed(y_old, a, b) * sin_theta
-        if (sin_theta > 1.0_8) then
+        y = y + cos_theta * wave_speed(y, a, b) * dt ! x, yを1ステップ進める
+        x = x + sin_theta * wave_speed(y, a, b) * dt 
+        sin_theta = wave_speed(y, a, b) / wave_speed(y_old, a, b) * sin_theta ! スネルの法則
+        if (sin_theta > 1.0_8) then ! 降下→上昇の切り替え
             sin_theta = sin_theta_old
             plus_cos = - 1.0_8
         end if
@@ -45,7 +45,7 @@ program seismic
 
 contains
 
-real(8) function wave_speed(y, a, b)
+real(8) function wave_speed(y, a, b) ! 速度プロファイル
         real(8) :: y, a, b
 
         wave_speed = a * y + b
