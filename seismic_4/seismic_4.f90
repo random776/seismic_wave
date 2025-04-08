@@ -7,7 +7,7 @@ program seismic
     real(8), allocatable :: speed_x(:), speed_y(:), speed_val(:, :)
     real(8), allocatable :: sin_theta_mod(:), cos_theta_mod(:), x_mod(:), y_mod(:)
     real(8) :: a, b, t, dt, t_end, pi, x_max, x_min, dx, y_max, y_min, dy, x_prev, y_prev
-    character(len=20) :: filename_x, filename_y, filename_t, filename_speed
+    character(len=20) :: filename_x, filename_y, filename_t, filename_speed, filename_curve
 
     allocate(x(n_angles), y(n_angles), x_old(n_angles), y_old(n_angles))
     allocate(sin_theta(n_angles), cos_theta(n_angles), sin_theta_old(n_angles))
@@ -29,6 +29,8 @@ program seismic
     open(unit=12, iostat=ios, file=trim(filename_t), action='write', form='formatted', status='replace')
     filename_speed = 'seismic_speed.dat'
     open(unit=13, iostat=ios, file=trim(filename_speed), action='write', form='formatted', status='replace')
+    filename_curve = 'seismic_curve.dat'
+    open(unit=14, iostat=ios, file=trim(filename_curve), action='write', form='formatted', status='replace')
 
     ! 初期条件
     x = 0.0_8
@@ -65,7 +67,7 @@ program seismic
     do while (t < t_end)
         do i = 1, n_angles
         if (sqrt(x(i)**2 + y(i)**2) <= 10.0_8 .and. x(i) >= 0.0_8 .and. y(i) >=0.0_8 ) then
-            ! 回転行列（座標変換）
+            ! 回転行列
             x_prev = x(i)
             y_prev = y(i)
             x_mod(i) = x(i) * wave_cos(x(i), y(i)) - y(i) * wave_sin(x(i), y(i))
@@ -92,6 +94,9 @@ program seismic
             y(i) = - x_mod(i) * wave_sin(x_prev, y_prev) + y_mod(i) * wave_cos(x_prev, y_prev)
             cos_theta(i) = cos_theta_mod(i) * wave_cos(x_prev, y_prev) + sin_theta_mod(i) * wave_sin(x_prev, y_prev)
             sin_theta(i) = -cos_theta_mod(i) * wave_sin(x_prev, y_prev) + sin_theta_mod(i) * wave_cos(x_prev, y_prev)
+            if (sqrt(x_prev ** 2 + y_prev ** 2) <= 10.0_8 .and. sqrt(x(i) ** 2 + y(i) ** 2) > 10.0_8) then
+                write(14, *) t, sqrt(x(i) ** 2 + y(i) ** 2) * acos(y(i) / sqrt(x(i) ** 2 + y(i) ** 2))
+            end if
         end if
 
         end do
@@ -111,6 +116,7 @@ program seismic
     close(11)
     close(12)
     close(13)
+    close(14)
 
     deallocate(x, y, x_mod, y_mod, x_old, y_old, sin_theta, cos_theta, sin_theta_mod, cos_theta_mod)
     deallocate(sin_theta_old, speed_x, speed_y, speed_val)
@@ -159,4 +165,3 @@ real(8) function wave_sin(x, y)
 end function wave_sin
 
 end program seismic
-

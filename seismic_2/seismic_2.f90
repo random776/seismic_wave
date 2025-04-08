@@ -72,7 +72,7 @@ program seismic
 
 contains
 
-real(8) function wave_speed(y)
+real(8) function wave_speed(y) ! 速度プロファイル（段差あり）
     real(8), intent(in) :: y
     if (0.0_8 <= y .and. y < 4.0_8) then
         wave_speed = y + 1.0_8
