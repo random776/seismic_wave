@@ -60,3 +60,4 @@ cbar.set_label("Wave Speed")
 
 ax.plot(data_x[:, 3830], data_y[:, 3830], c="blue", marker=".", markersize=1.0, linewidth=0)
 plt.show()
+

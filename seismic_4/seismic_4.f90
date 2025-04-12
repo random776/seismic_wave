@@ -1,5 +1,6 @@
 program seismic
     implicit none
+    ! 変数の宣言
     integer :: ios, i, j, n_out
     integer, parameter :: n_angles = 5000, n_points = 100
     real(8), allocatable :: x(:), y(:), x_old(:), y_old(:), sin_theta(:), cos_theta(:)
@@ -9,18 +10,19 @@ program seismic
     real(8) :: a, b, t, dt, t_end, pi, x_max, x_min, dx, y_max, y_min, dy, x_prev, y_prev
     character(len=20) :: filename_x, filename_y, filename_t, filename_speed, filename_curve
 
+    ! 配列の割り当て
     allocate(x(n_angles), y(n_angles), x_old(n_angles), y_old(n_angles))
     allocate(sin_theta(n_angles), cos_theta(n_angles), sin_theta_old(n_angles))
     allocate(theta(n_angles), plus_cos(n_angles))
     allocate(speed_x(n_points), speed_y(n_points), speed_val(n_points, n_points))
     allocate(sin_theta_mod(n_angles), cos_theta_mod(n_angles), x_mod(n_angles), y_mod(n_angles))
 
-    ! 角度の設定
+    ! 入射角の設定（浅い角度を多くサンプリング）
     do i = 1, n_angles
         theta(i) = 90.0 * (1.0_8 - (real(i) / n_angles) ** (1.0_8 / 15.0_8))
     end do
 
-    ! 結果を1つのファイルにまとめて保存
+    ! 出力ファイルの準備
     filename_x = 'seismic_x.dat'
     open(unit=10, iostat=ios, file=trim(filename_x), action='write', form='formatted', status='replace')
     filename_y = 'seismic_y.dat'
@@ -32,9 +34,9 @@ program seismic
     filename_curve = 'seismic_curve.dat'
     open(unit=14, iostat=ios, file=trim(filename_curve), action='write', form='formatted', status='replace')
 
-    ! 初期条件
+    ! 初期設定
     x = 0.0_8
-    y = 10.0_8
+    y = 10.0_8         ! 発信点の初期高さ（地表）
     a = 1.0_8
     b = 2.0_8
     t = 0.0_8
@@ -46,7 +48,7 @@ program seismic
     sin_theta = sin(pi / 180.0_8 * theta)
     cos_theta = cos(pi / 180.0_8 * theta)
 
-    ! wave_speed のデータを生成
+    ! 波速の分布（グリッドデータ）を生成
     x_max = 20.0_8
     x_min = -20.0_8
     y_max = 20.0_8
@@ -62,48 +64,54 @@ program seismic
         end do
     end do
 
-
-    ! メインループ
+    ! メインの時間発展ループ
     do while (t < t_end)
         do i = 1, n_angles
-        if (sqrt(x(i)**2 + y(i)**2) <= 10.0_8 .and. x(i) >= 0.0_8 .and. y(i) >=0.0_8 ) then
-            ! 回転行列
-            x_prev = x(i)
-            y_prev = y(i)
-            x_mod(i) = x(i) * wave_cos(x(i), y(i)) - y(i) * wave_sin(x(i), y(i))
-            y_mod(i) = x(i) * wave_sin(x(i), y(i)) + y(i) * wave_cos(x(i), y(i))
-            cos_theta_mod(i) = cos_theta(i) * wave_cos(x(i), y(i)) - sin_theta(i) * wave_sin(x(i), y(i))
-            sin_theta_mod(i) = cos_theta(i) * wave_sin(x(i), y(i)) + sin_theta(i) * wave_cos(x(i), y(i))
+            ! 伝播中かどうかを判定
+            if (sqrt(x(i)**2 + y(i)**2) <= 10.0_8 .and. x(i) >= 0.0_8 .and. y(i) >= 0.0_8) then
+                ! 直交座標から極座標系方向への回転
+                x_prev = x(i)
+                y_prev = y(i)
+                x_mod(i) = x(i) * wave_cos(x(i), y(i)) - y(i) * wave_sin(x(i), y(i))
+                y_mod(i) = x(i) * wave_sin(x(i), y(i)) + y(i) * wave_cos(x(i), y(i))
+                cos_theta_mod(i) = cos_theta(i) * wave_cos(x(i), y(i)) - sin_theta(i) * wave_sin(x(i), y(i))
+                sin_theta_mod(i) = cos_theta(i) * wave_sin(x(i), y(i)) + sin_theta(i) * wave_cos(x(i), y(i))
 
-            x_old(i) = x_mod(i)
-            y_old(i) = y_mod(i)
-            sin_theta_old(i) = sin_theta_mod(i)
+                ! 一時保存とSnellの法則の適用
+                x_old(i) = x_mod(i)
+                y_old(i) = y_mod(i)
+                sin_theta_old(i) = sin_theta_mod(i)
 
-            y_mod(i) = y_mod(i) - cos_theta_mod(i) * wave_speed(x_mod(i), y_mod(i)) * dt 
-            x_mod(i) = x_mod(i) + sin_theta_mod(i) * wave_speed(x_mod(i), y_mod(i)) * dt
+                ! 位置の更新
+                y_mod(i) = y_mod(i) - cos_theta_mod(i) * wave_speed(x_mod(i), y_mod(i)) * dt
+                x_mod(i) = x_mod(i) + sin_theta_mod(i) * wave_speed(x_mod(i), y_mod(i)) * dt
 
-            sin_theta_mod(i) = wave_speed(x_mod(i), y_mod(i)) / wave_speed(x_old(i), y_old(i)) * sin_theta_mod(i)
-            if (sin_theta_mod(i) > 1.0_8) then
-                sin_theta_mod(i) = sin_theta_old(i) 
-                plus_cos(i) = - 1.0_8
+                ! Snellの法則に基づく角度更新
+                sin_theta_mod(i) = wave_speed(x_mod(i), y_mod(i)) / wave_speed(x_old(i), y_old(i)) * sin_theta_mod(i)
+                if (sin_theta_mod(i) > 1.0_8) then
+                    sin_theta_mod(i) = sin_theta_old(i)
+                    plus_cos(i) = -1.0_8  ! 全反射の処理
+                end if
+                cos_theta_mod(i) = plus_cos(i) * sqrt(1.0_8 - sin_theta_mod(i)**2)
+
+                ! 逆回転（元の座標系へ）
+                x(i) = x_mod(i) * wave_cos(x_prev, y_prev) + y_mod(i) * wave_sin(x_prev, y_prev)
+                y(i) = -x_mod(i) * wave_sin(x_prev, y_prev) + y_mod(i) * wave_cos(x_prev, y_prev)
+                cos_theta(i) = cos_theta_mod(i) * wave_cos(x_prev, y_prev) + sin_theta_mod(i) * wave_sin(x_prev, y_prev)
+                sin_theta(i) = -cos_theta_mod(i) * wave_sin(x_prev, y_prev) + sin_theta_mod(i) * wave_cos(x_prev, y_prev)
+
+                ! 境界到達時に曲線情報を記録
+                if (sqrt(x_prev ** 2 + y_prev ** 2) <= 10.0_8 .and. sqrt(x(i) ** 2 + y(i) ** 2) > 10.0_8) then
+                    write(14, *) t, sqrt(x(i) ** 2 + y(i) ** 2) * acos(y(i) / sqrt(x(i) ** 2 + y(i) ** 2))
+                end if
             end if
-            cos_theta_mod(i) = plus_cos(i) * sqrt(1.0_8 - sin_theta_mod(i)**2)
-
-            ! 逆回転行列
-            x(i) = x_mod(i) * wave_cos(x_prev, y_prev) + y_mod(i) * wave_sin(x_prev, y_prev)
-            y(i) = - x_mod(i) * wave_sin(x_prev, y_prev) + y_mod(i) * wave_cos(x_prev, y_prev)
-            cos_theta(i) = cos_theta_mod(i) * wave_cos(x_prev, y_prev) + sin_theta_mod(i) * wave_sin(x_prev, y_prev)
-            sin_theta(i) = -cos_theta_mod(i) * wave_sin(x_prev, y_prev) + sin_theta_mod(i) * wave_cos(x_prev, y_prev)
-            if (sqrt(x_prev ** 2 + y_prev ** 2) <= 10.0_8 .and. sqrt(x(i) ** 2 + y(i) ** 2) > 10.0_8) then
-                write(14, *) t, sqrt(x(i) ** 2 + y(i) ** 2) * acos(y(i) / sqrt(x(i) ** 2 + y(i) ** 2))
-            end if
-        end if
-
         end do
+
+        ! 時間更新
         t = t + dt
         n_out = n_out + 1
 
-        ! 100 ステップごとに出力
+        ! 一定ステップごとに出力
         if (mod(n_out, 50) == 0) then
             write(10, *) x
             write(11, *) y
@@ -111,20 +119,20 @@ program seismic
         end if
     end do
 
-    ! ファイルを閉じる
+    ! ファイルのクローズ
     close(10)
     close(11)
     close(12)
     close(13)
     close(14)
 
+    ! メモリの解放
     deallocate(x, y, x_mod, y_mod, x_old, y_old, sin_theta, cos_theta, sin_theta_mod, cos_theta_mod)
     deallocate(sin_theta_old, speed_x, speed_y, speed_val)
-    ! プログラム終了
+
 contains
 
-! 波速定義
-
+! 半径に応じた波の伝播速度
 real(8) function wave_speed(x, y)
     real(8), intent(in) :: x, y
     real(8) :: r
@@ -140,8 +148,7 @@ real(8) function wave_speed(x, y)
     end if
 end function wave_speed
 
-! 法線ベクトルの定義(wave_speed専用)
-
+! 波速勾配方向（法線ベクトル）の cos 成分
 real(8) function wave_cos(x, y)
     real(8), intent(in) :: x, y
     real(8) :: r
@@ -153,6 +160,7 @@ real(8) function wave_cos(x, y)
     end if
 end function wave_cos
 
+! 波速勾配方向（法線ベクトル）の sin 成分
 real(8) function wave_sin(x, y)
     real(8), intent(in) :: x, y
     real(8) :: r
