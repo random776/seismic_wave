@@ -20,7 +20,7 @@ program seismic
 
     ! 入射角の設定（浅い角度を多くサンプリング）
     do i = 1, n_angles
-        theta(i) = 90.0 * (1.0_8 - (real(i) / n_angles) ** (1.0_8 / 15.0_8))
+        theta(i) = - 90.0 * (real(i) / n_angles) ** (1.0_8 / 15.0_8) !負であることに注意
     end do
 
     ! 出力ファイルの準備
@@ -36,8 +36,8 @@ program seismic
     open(unit=14, iostat=ios, file=trim(filename_curve), action='write', form='formatted', status='replace')
 
     ! 初期設定
-    x = 0.03_8
-    y = 9.9_8         ! 発信点の初期高さ（地表）
+    x = 0.02_8
+    y = 9.98_8         ! 発信点の初期高さ（地表）
     a = 1.0_8
     b = 2.0_8
     t = 0.0_8
@@ -51,6 +51,8 @@ program seismic
 
     sin_theta = sin(theta)
     cos_theta = cos(theta)
+
+    ! write(*, *) theta
 
     ! 波速の分布（グリッドデータ）を生成
     x_max = 20.0_8
@@ -78,14 +80,14 @@ program seismic
                 x_prev = x(i)
                 y_prev = y(i)
                 
-                delv_delx = (wave_speed(x(i) + div, y(i)) - wave_speed(x(i), y(i))) / div
-                delv_dely = (wave_speed(x(i), y(i) + div) - wave_speed(x(i), y(i))) / div 
+                delv_delx = (wave_speed(x(i) + div, y(i)) - wave_speed(x(i) - div, y(i))) / (2*div)
+                delv_dely = (wave_speed(x(i), y(i) + div) - wave_speed(x(i), y(i) - div)) / (2*div)
 
-                theta(i) = theta(i) + dt * (delv_delx * sin(theta(i)) - delv_dely * cos(theta(i)))
+                theta(i) = theta(i) + dt * (delv_delx * sin_theta(i) - delv_dely * cos_theta(i))
                 sin_theta(i) = sin(theta(i))
                 cos_theta(i) = cos(theta(i))
-                x(i) = x(i) + dt * wave_speed(x(i), y(i)) * sin_theta(i)
-                y(i) = y(i) + dt * wave_speed(x(i), y(i)) * (-cos_theta(i))
+                x(i) = x(i) + dt * wave_speed(x(i), y(i)) * cos_theta(i)
+                y(i) = y(i) + dt * wave_speed(x(i), y(i)) * sin_theta(i)
 
                 ! 境界到達時に曲線情報を記録
                 if (sqrt(x_prev ** 2 + y_prev ** 2) <= 10.0_8 .and. sqrt(x(i) ** 2 + y(i) ** 2) > 10.0_8) then
@@ -134,29 +136,5 @@ real(8) function wave_speed(x, y)
         wave_speed = 0.0_8
     end if
 end function wave_speed
-
-! 波速勾配方向（法線ベクトル）の cos 成分
-real(8) function wave_cos(x, y)
-    real(8), intent(in) :: x, y
-    real(8) :: r
-    r = sqrt(x**2 + y**2)
-    if (r > 1.0d-10) then
-        wave_cos = y / r
-    else
-        wave_cos = 0.0_8
-    end if
-end function wave_cos
-
-! 波速勾配方向（法線ベクトル）の sin 成分
-real(8) function wave_sin(x, y)
-    real(8), intent(in) :: x, y
-    real(8) :: r
-    r = sqrt(x**2 + y**2)
-    if (r > 1.0d-10) then
-        wave_sin = x / r
-    else
-        wave_sin = 0.0_8
-    end if
-end function wave_sin
 
 end program seismic
